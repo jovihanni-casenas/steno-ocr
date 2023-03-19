@@ -1,0 +1,5 @@
+observations:
+- once the preprocessed image is resized into a smaller one,
+  some pixels turn gray and no longer black and white,
+  can refer to the flattened_images.txt file, you can see values
+  that are not 0 and 255
