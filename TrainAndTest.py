@@ -66,8 +66,8 @@ def main():
     knn_data.process_test_images(TEST_DIR)
     print('done processing test images...')
     knn_data.train_model()
-    knn_data.find_nearest_neighbor()
     print('done training model...')
+    knn_data.find_nearest_neighbor()
 
 
 if __name__ == '__main__':
