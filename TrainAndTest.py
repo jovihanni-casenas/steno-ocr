@@ -14,6 +14,7 @@ is_train_data = False
 
 
 class TrainAndTest:
+    train_flat_shape = (1, 900)
     train_images = None
     train_labels = []
     label_ref = []
@@ -39,8 +40,8 @@ class TrainAndTest:
         float_test_images = self.test_images.flattened_images
 
         for test_img in float_test_images:
-            test_img = test_img.reshape((1, 900))
-            retval, results, neigh_resp, dists = self.knn.findNearest(test_img, k=5)
+            test_img = test_img.reshape(self.train_flat_shape)
+            retval, results, neigh_resp, dists = self.knn.findNearest(test_img, k=11)
             self.find_pred_label(results[0][0])
             # commented out, might be used later for viewing the test img
             # test_img = np.reshape(test_img, (30, 30))

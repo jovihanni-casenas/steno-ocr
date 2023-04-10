@@ -4,6 +4,7 @@
 # as well as create txt files for the float training images and labels
 
 import cv2
+import imutils
 import numpy as np
 import os
 # from PIL import Image
@@ -17,10 +18,12 @@ class ImgPreprocessing:
     final_labels = []
     new_width = 30
     new_height = 30
-    min_contour_area = 80
+    min_contour_area = 700
     label_id = 1
     path = ''
     is_train_data = False
+    file_path = None
+    img_size = None
 
     def load_data(self, path, is_train_data):
         self.path = path
@@ -28,30 +31,29 @@ class ImgPreprocessing:
         self.flattened_images = np.empty((0, self.new_width * self.new_height))
         folders = os.listdir(self.path)
 
-        # train images are inside folders with their respective longhand translation as folder name
+        # train and test images are inside folders with their respective longhand translation as folder name
         # iterate through folders
         for folder in folders:
+            self.process_data(folder)
+            # old block of code
+            # will update this ky ag test data i-sort to folders na
             # generate list of file names if this function is called for training data
-            if self.is_train_data:
-                files = os.listdir(self.path + folder + "/")
-                # iterate through all images in the folder
-                for file_name in files:
-                    self.preprocess_images(folder, file_name)
-                    self.labels_id.append(float(self.label_id))
-                # append label ID and label name to the reference file
-                self.labels_ref.append(float(self.label_id))
-                self.labels_ref.append(folder)
-                self.label_id += 1
-            # considers the 'folder' name as the file name for testing data as this category of images are placed in a single folder 'test data'
-            else:
-                file_name = folder
-                self.preprocess_images("", file_name)
+            # if self.is_train_data:
+            #     self.process_train_data(folder)
+            # # considers the 'folder' name as the file name for testing data as this category of images are placed in a single folder 'test data'
+            # else:
+            #     file_name = folder
+            #     self.get_path("", file_name)
+            #     read_img = cv2.imread(self.file_path)
+            #     height, width, channels = read_img.shape  # take img shape as reference for border detection
+            #     self.img_size = width * height  # area of img calculated for border detection later
+            #     self.preprocess_images(read_img)
 
         # convert flattened images to float32 data type for knn feeding
         self.flattened_images = np.float32(self.flattened_images)
 
         # saving the images, labels IDs, and label reference as txt files
-        if is_train_data:
+        if self.is_train_data:
             float_labels = np.array(self.labels_id, np.float32)
             self.final_labels = float_labels.reshape((float_labels.size, 1))
             np.savetxt('flattened_images.txt', self.flattened_images)
@@ -59,14 +61,45 @@ class ImgPreprocessing:
             np.savetxt('labels_ref.txt', self.labels_ref, delimiter=",", fmt="%s")
     # end of load_data()
 
-    def preprocess_images(self, folder_name, file_name):
-        # file path has additional folder in it if training data is to be processed
-        if self.is_train_data:
-            file_path = self.path + folder_name + "/" + file_name
-        else:
-            file_path = self.path + file_name
+    def get_path(self, folder_name, file_name):
+        self.file_path = self.path + folder_name + "/" + file_name
 
-        read_img = cv2.imread(file_path)                                    # reading image
+        # old block of code atong wala pa i sort by folder ang test data
+        # # file path has additional folder in it if training data is to be processed
+        # if self.is_train_data:
+        #     self.file_path = self.path + folder_name + "/" + file_name
+        # else:
+        #     self.file_path = self.path + file_name
+    # end of get_path()
+
+    def process_data(self, folder):
+        files = os.listdir(self.path + folder + "/")
+        # iterate through all images in the folder
+        for file_name in files:
+            self.get_path(folder, file_name)
+            print(self.file_path)
+            read_img = cv2.imread(self.file_path)
+            height, width, channels = read_img.shape    # take img shape as reference for border detection
+            self.img_size = width * height              # area of img calculated for border detection later
+            if not self.is_train_data:
+                self.preprocess_images(read_img)
+            else:
+                # rotate image from -45 to 45 degrees
+                i = -45
+                while i <= 45:
+                    rotated = imutils.rotate_bound(read_img, i)
+                    self.preprocess_images(rotated)
+                    self.labels_id.append(float(self.label_id))
+                    i += 1
+
+        if self.is_train_data:
+            # append label ID and label name to the reference file
+            self.labels_ref.append(float(self.label_id))
+            self.labels_ref.append(folder)
+            self.label_id += 1
+    # end of process_train_data()
+
+    def preprocess_images(self, read_img):
         img_gray = cv2.cvtColor(read_img, cv2.COLOR_BGR2GRAY)               # converting it to grayscale
         img_blurred = cv2.GaussianBlur(img_gray, (9, 9), 0)                 # blurring to reduce noise
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4))       # getting kernel for erosion
@@ -82,7 +115,7 @@ class ImgPreprocessing:
         kernel_for_close = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 35))
         closing = cv2.morphologyEx(dilation, cv2.MORPH_CLOSE, kernel_for_close) # some areas w/in the strokes are open, this is to make sure the strokes are solid
 
-        img_thresh = dilation.copy()
+        img_thresh = closing.copy()
         img_thresh_copy = img_thresh
         # finding contours in the image
         contours, heirarchy = cv2.findContours(img_thresh_copy, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
@@ -91,7 +124,8 @@ class ImgPreprocessing:
         for contour in contours:
             col = []
             # checking if contour area is large enough to be considered a part of the stroke
-            if cv2.contourArea(contour) > self.min_contour_area:
+            # or if contour area is as large as perimeter of image, hence the border
+            if self.min_contour_area < cv2.contourArea(contour) < self.img_size * 0.8:
                 [x, y, width, height] = cv2.boundingRect(contour)
                 col.append(x)
                 col.append(y)
@@ -120,8 +154,10 @@ class ImgPreprocessing:
 
         cropped_img = img_thresh[y:y+h, x:x+w]
         cropped_resized_img = cv2.resize(cropped_img, (self.new_width, self.new_height)) # must resize image to make all images uniform
-        flat_img = cropped_resized_img.reshape((1, self.new_width * self.new_height))    # reshape array to 1D
-        self.flattened_images = np.append(self.flattened_images, flat_img, 0)            # append image to the list of flattened images
+        cv2.imshow('fin img', cropped_resized_img)
+        cv2.waitKey(1)
+        flat_img = cropped_resized_img.reshape((1, self.new_width * self.new_height))  # reshape array to 1D
+        self.flattened_images = np.append(self.flattened_images, flat_img, 0)  # append image to the list of flattened images
     # end load_images
 
 # end ImgPreprocessing
