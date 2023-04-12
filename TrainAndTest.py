@@ -21,6 +21,9 @@ class TrainAndTest:
     test_images = ImgPreprocessing()
     knn = cv2.ml.KNearest_create()
     pred_label = None
+    predicted_labels = []
+    correct = 0
+    wrong = 0
 
     def load_train_data(self):
         # loading images and labels from the txt files
@@ -54,9 +57,24 @@ class TrainAndTest:
         for i in range(len(self.label_ref)):
             if str(self.label_ref[i]) == str(float_label):
                 self.pred_label = self.label_ref[i+1]
-                print(self.pred_label)
+                self.predicted_labels.append(self.pred_label)
                 break
 
+    def print_results(self):
+        total_data = 0
+        for i in range(len(self.test_images.string_labels)):
+            # print(self.test_images.string_labels[i])
+            # print(self.predicted_labels[i])
+            # print('\n')
+            if self.test_images.string_labels[i] == self.predicted_labels[i]:
+                self.correct += 1
+            else:
+                self.wrong += 1
+            total_data += 1
+        print('number of test data: ', total_data)
+        print('correctly predicted labels: ', self.correct)
+        print('incorrectly predicted labels: ', self.wrong)
+        print('accuracy: ', self.correct/total_data)
 
 # =============================================================================
 
@@ -69,6 +87,8 @@ def main():
     knn_data.train_model()
     print('done training model...')
     knn_data.find_nearest_neighbor()
+    print('printing results...')
+    knn_data.print_results()
 
 
 if __name__ == '__main__':

@@ -16,6 +16,7 @@ class ImgPreprocessing:
     labels_ref = []
     labels_id = []
     final_labels = []
+    string_labels = []
     new_width = 30
     new_height = 30
     min_contour_area = 700
@@ -23,7 +24,9 @@ class ImgPreprocessing:
     path = ''
     is_train_data = False
     file_path = None
+    file_name = None
     img_size = None
+    img_processed = False
 
     def load_data(self, path, is_train_data):
         self.path = path
@@ -35,19 +38,6 @@ class ImgPreprocessing:
         # iterate through folders
         for folder in folders:
             self.process_data(folder)
-            # old block of code
-            # will update this ky ag test data i-sort to folders na
-            # generate list of file names if this function is called for training data
-            # if self.is_train_data:
-            #     self.process_train_data(folder)
-            # # considers the 'folder' name as the file name for testing data as this category of images are placed in a single folder 'test data'
-            # else:
-            #     file_name = folder
-            #     self.get_path("", file_name)
-            #     read_img = cv2.imread(self.file_path)
-            #     height, width, channels = read_img.shape  # take img shape as reference for border detection
-            #     self.img_size = width * height  # area of img calculated for border detection later
-            #     self.preprocess_images(read_img)
 
         # convert flattened images to float32 data type for knn feeding
         self.flattened_images = np.float32(self.flattened_images)
@@ -63,22 +53,18 @@ class ImgPreprocessing:
 
     def get_path(self, folder_name, file_name):
         self.file_path = self.path + folder_name + "/" + file_name
-
-        # old block of code atong wala pa i sort by folder ang test data
-        # # file path has additional folder in it if training data is to be processed
-        # if self.is_train_data:
-        #     self.file_path = self.path + folder_name + "/" + file_name
-        # else:
-        #     self.file_path = self.path + file_name
+        self.file_name = file_name
     # end of get_path()
 
     def process_data(self, folder):
         files = os.listdir(self.path + folder + "/")
+
         # iterate through all images in the folder
         for file_name in files:
             self.get_path(folder, file_name)
-            print(self.file_path)
             read_img = cv2.imread(self.file_path)
+            if self.is_train_data:
+                print(self.file_path)
             height, width, channels = read_img.shape    # take img shape as reference for border detection
             self.img_size = width * height              # area of img calculated for border detection later
             if not self.is_train_data:
@@ -91,6 +77,8 @@ class ImgPreprocessing:
                     self.preprocess_images(rotated)
                     self.labels_id.append(float(self.label_id))
                     i += 1
+            if self.img_processed:
+                self.string_labels.append(folder)
 
         if self.is_train_data:
             # append label ID and label name to the reference file
@@ -138,10 +126,15 @@ class ImgPreprocessing:
 
         # finding location, width, and height of the stroke's bounding box for cropping
         rects_len = range(len(rects))
-        x = min(rects[i][0] for i in rects_len)
-        y = min(rects[i][1] for i in rects_len)
-        w = max(rects[i][0] + rects[i][2] for i in rects_len) - x
-        h = max(rects[i][1] + rects[i][3] for i in rects_len) - y
+        try:
+            x = min(rects[i][0] for i in rects_len)
+            y = min(rects[i][1] for i in rects_len)
+            w = max(rects[i][0] + rects[i][2] for i in rects_len) - x
+            h = max(rects[i][1] + rects[i][3] for i in rects_len) - y
+        except:
+            print('image', self.file_name,  'is blurry, cannot be processed...')
+            self.img_processed = False
+            return
 
         # this is here if ever we want to see which part of the image is the bounding box placed
         # still need to add cv.imshow('label', src) tho
@@ -158,6 +151,8 @@ class ImgPreprocessing:
         cv2.waitKey(1)
         flat_img = cropped_resized_img.reshape((1, self.new_width * self.new_height))  # reshape array to 1D
         self.flattened_images = np.append(self.flattened_images, flat_img, 0)  # append image to the list of flattened images
+
+        self.img_processed = True
     # end load_images
 
 # end ImgPreprocessing
