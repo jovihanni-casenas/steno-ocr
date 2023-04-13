@@ -3,3 +3,9 @@ observations:
   some pixels turn gray and no longer black and white,
   can refer to the flattened_images.txt file, you can see values
   that are not 0 and 255
+
+recommendation for preprocessing to POSSIBLY shorten its runtime:
+-take valid contours and crop first
+-this cropped, but not resized image, shall be used for rotation
+-take contours again and crop
+-resize to desired size
